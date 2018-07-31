@@ -21,14 +21,10 @@ Device = namedtuple('Device', ['mac', 'name', 'ip', 'interface'])
 
 class Client(object):
     def __init__(self, connection: Connection):
-        if not connection.connected:
-            connection.connect()
         self._connection = connection
 
-    def get_devices(self) -> Optional[List[Device]]:
+    def get_devices(self) -> List[Device]:
         lines = self._connection.run_command(_ARP_CMD)
-        if not lines:
-            return None
 
         result = _parse_lines(lines, _ARP_REGEX)
 
