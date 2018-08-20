@@ -35,13 +35,13 @@ class TelnetConnection(Connection):
     def __init__(self, host: str, port: int, username: str, password: str,
                  timeout: int = 30):
         """Initialize the Telnet connection properties."""
-        self._telnet: telnetlib.Telnet = None
+        self._telnet = None
         self._host = host
         self._port = port
         self._username = username
         self._password = password
         self._timeout = timeout
-        self._prompt_string: bytes = None
+        self._prompt_string = None
 
     def run_command(self, command):
         """Run a command through a Telnet connection.
