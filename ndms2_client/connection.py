@@ -52,9 +52,9 @@ class TelnetConnection(Connection):
             self.connect()
 
         try:
-            self._telnet.write('{}\n'.format(command).encode('ascii'))
+            self._telnet.write('{}\n'.format(command).encode('UTF-8'))
             return self._read_until(self._prompt_string) \
-                       .decode('ascii') \
+                       .decode('UTF-8') \
                        .split('\n')[1:-1]
         except Exception as e:
             message = "Error executing command: %s" % str(e)
@@ -68,9 +68,9 @@ class TelnetConnection(Connection):
             self._telnet = telnetlib.Telnet(self._host, self._port,
                                             self._timeout)
             self._read_until(b'Login: ')
-            self._telnet.write((self._username + '\n').encode('ascii'))
+            self._telnet.write((self._username + '\n').encode('UTF-8'))
             self._read_until(b'Password: ')
-            self._telnet.write((self._password + '\n').encode('ascii'))
+            self._telnet.write((self._password + '\n').encode('UTF-8'))
 
             self._prompt_string = self._read_until(b'>').split(b'\n')[-1]
         except Exception:
