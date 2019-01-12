@@ -13,7 +13,7 @@ _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
 _INTERFACE_CMD = 'show interface %s'
 _ARP_REGEX = re.compile(
-    r'(?P<name>(.+?) )?\s+' +
+    r'(?P<name>(.+?))?\s+' +
     r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
     r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
     r'(?P<interface>([^ ]+))\s+'
