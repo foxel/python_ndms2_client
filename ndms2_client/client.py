@@ -84,7 +84,7 @@ class Client(object):
     # hotspot info is only available in newest firmware
     # however on older firmware missing command error will lead to empty dict returned
     def __get_hotpot_info(self):
-        info = _parse_dict_lines(self._connection.run_command(_HOTSPOT_CMD))
+        info = _parse_dict_lines(self._connection.run_command(_HOTSPOT_CMD), True)
 
         items = info.get('host', [])
         if not isinstance(items, list):
@@ -112,7 +112,7 @@ def _parse_table_lines(lines: List[str], regex: re) -> List[Dict[str, any]]:
     return results
 
 
-def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
+def _parse_dict_lines(lines: List[str], ignoreComma = False) -> Dict[str, any]:
     response = {}
     stack = [(None, response)]
     stack_level = 0
@@ -134,7 +134,9 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
     for line in fixed_lines:
         # exploding the line
         colon_pos = line.index(':')
-        comma_pos = line.index(',') if ',' in line else None
+        comma_pos = None
+        if (ignoreComma == False):
+            comma_pos = line.index(',') if ',' in line else None
         key = line[:colon_pos].strip()
         value = line[(colon_pos + 1):].strip()
         new_indent = comma_pos if comma_pos is not None else colon_pos
