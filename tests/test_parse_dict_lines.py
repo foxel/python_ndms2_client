@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
+# noinspection PyProtectedMember
 def test_parse_dict_lines(dict_text):
     from ndms2_client.client import _parse_dict_lines
 

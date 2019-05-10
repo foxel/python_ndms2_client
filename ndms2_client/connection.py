@@ -1,6 +1,6 @@
 import logging
 import re
-import telnetlib
+from telnetlib import Telnet
 from typing import List
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,20 +28,20 @@ class Connection(object):
 class TelnetConnection(Connection):
     """Maintains a Telnet connection to a router."""
 
-    @property
-    def connected(self):
-        return self._telnet is not None
-
     def __init__(self, host: str, port: int, username: str, password: str,
                  timeout: int = 30):
         """Initialize the Telnet connection properties."""
-        self._telnet = None
+        self._telnet = None  # type: Telnet
         self._host = host
         self._port = port
         self._username = username
         self._password = password
         self._timeout = timeout
-        self._prompt_string = None
+        self._prompt_string = None  # type: bytes
+
+    @property
+    def connected(self):
+        return self._telnet is not None
 
     def run_command(self, command):
         """Run a command through a Telnet connection.
@@ -52,6 +52,7 @@ class TelnetConnection(Connection):
             self.connect()
 
         try:
+            self._telnet.read_very_eager()  # this is here to flush the read buffer
             self._telnet.write('{}\n'.format(command).encode('UTF-8'))
             return self._read_until(self._prompt_string) \
                        .decode('UTF-8') \
@@ -65,16 +66,15 @@ class TelnetConnection(Connection):
     def connect(self):
         """Connect to the Telnet server."""
         try:
-            self._telnet = telnetlib.Telnet(self._host, self._port,
-                                            self._timeout)
+            self._telnet = Telnet(self._host, self._port, self._timeout)
             self._read_until(b'Login: ')
             self._telnet.write((self._username + '\n').encode('UTF-8'))
             self._read_until(b'Password: ')
             self._telnet.write((self._password + '\n').encode('UTF-8'))
 
             self._prompt_string = self._read_until(b'>').split(b'\n')[-1]
-        except Exception:
-            message = "Error connecting to telnet server"
+        except Exception as e:
+            message = "Error connecting to telnet server: %s" % str(e)
             _LOGGER.error(message)
             self._telnet = None
             raise ConnectionException(message) from None
@@ -91,5 +91,5 @@ class TelnetConnection(Connection):
 
     def _read_until(self, needle: bytes):
         (i, _, text) = self._telnet.expect([re.escape(needle)], self._timeout)
-        assert i is 0
+        assert i is 0, "No expected response from server"
         return text

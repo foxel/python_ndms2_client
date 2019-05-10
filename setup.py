@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="ndms2_client",
-    version="0.0.6",
+    version="0.0.7",
     author="Andrey F. Kupreychik",
     author_email="foxel@quickfox.ru",
     description="Keenetic NDMS2 client",
