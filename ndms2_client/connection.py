@@ -67,6 +67,8 @@ class TelnetConnection(Connection):
         """Connect to the Telnet server."""
         try:
             self._telnet = Telnet(self._host, self._port, self._timeout)
+            self._telnet.set_option_negotiation_callback(TelnetConnection.__set_max_window_size)
+
             self._read_until(b'Login: ')
             self._telnet.write((self._username + '\n').encode('UTF-8'))
             self._read_until(b'Password: ')
@@ -93,3 +95,31 @@ class TelnetConnection(Connection):
         (i, _, text) = self._telnet.expect([re.escape(needle)], self._timeout)
         assert i is 0, "No expected response from server"
         return text
+
+    # noinspection PyProtectedMember
+    @staticmethod
+    def __set_max_window_size(tsocket, command, option):
+        """
+        Set Window size to resolve line width issue
+        Set Windows size command: IAC SB NAWS <16-bit value> <16-bit value> IAC SE
+        --> inform the Telnet server of the window width and height.
+        Refer to https://www.ietf.org/rfc/rfc1073.txt
+        :param tsocket: telnet socket object
+        :param command: telnet Command
+        :param option: telnet option
+        :return: None
+        """
+        from telnetlib import DO, DONT, IAC, WILL, WONT, NAWS, SB, SE
+        import struct
+
+        if option == NAWS:
+            width = struct.pack('H', 65000)
+            height = struct.pack('H', 5000)
+            tsocket.send(IAC + WILL + NAWS)
+            tsocket.send(IAC + SB + NAWS + width + height + IAC + SE)
+        # -- below code taken from telnetlib source
+        elif command in (DO, DONT):
+            tsocket.send(IAC + WONT + option)
+        elif command in (WILL, WONT):
+            tsocket.send(IAC + DONT + option)
+

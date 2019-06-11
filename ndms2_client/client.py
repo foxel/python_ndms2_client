@@ -118,20 +118,10 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
     stack_level = 0
     indent = 0
 
-    # fixing line feeds in response
-    fixed_lines = []
     for line in lines:
         if len(line.strip()) == 0:
             continue
 
-        if ':' not in line:
-            assert len(fixed_lines) > 0, "Found a line with no colon in the beginning of the file"
-            prev_line = fixed_lines.pop()
-            line = prev_line + ' ' + line.strip()
-
-        fixed_lines.append(line)
-
-    for line in fixed_lines:
         # exploding the line
         colon_pos = line.index(':')
         comma_pos = line.index(',') if ',' in line else None
