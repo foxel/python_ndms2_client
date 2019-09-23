@@ -127,10 +127,10 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
         comma_pos = line.index(',') if ',' in line else None
         key = line[:colon_pos].strip()
         value = line[(colon_pos + 1):].strip()
-        new_indent = comma_pos if comma_pos is not None else colon_pos
+        new_indent = comma_pos if comma_pos is not None and comma_pos < colon_pos else colon_pos
 
         # assuming line is like 'mac-access, id = Bridge0: ...'
-        if comma_pos is not None:
+        if comma_pos is not None and comma_pos < colon_pos:
             key = line[:comma_pos].strip()
 
             value = {key: value} if value != '' else {}
