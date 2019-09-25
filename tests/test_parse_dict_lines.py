@@ -13,7 +13,7 @@ def test_parse_dict_lines(dict_text):
     _parse_dict_lines(dict_text.split('\n'))
 
 
-@pytest.fixture(params=range(3))
+@pytest.fixture(params=range(4))
 def dict_text(request):
     data = ['''
 
@@ -312,6 +312,27 @@ def dict_text(request):
                  schedule: 
 
            mac-access, id = Bridge0: permit
+
+''', '''
+
+               id: WifiMaster0/AccessPoint0
+            index: 0
+             type: AccessPoint
+      description: Wi-Fi access point
+   interface-name: AccessPoint
+             link: up
+        connected: yes
+            state: up
+              mtu: 1500
+         tx-queue: 1000
+            group: Home
+
+           usedby: Bridge0
+
+              mac: 00:ff:00:00:00:00
+        auth-type: none
+             ssid: home
+       encryption: wpa2,wpa3
 
 ''']
     return data[request.param]
