@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 def test_parse_dict_lines(dict_text):
     from ndms2_client.client import _parse_dict_lines
 
-    _parse_dict_lines(dict_text.split('\n'))
+    print(_parse_dict_lines(dict_text.split('\n')))
 
 
 @pytest.fixture(params=range(4))
@@ -206,7 +206,7 @@ def dict_text(request):
                   via: 10:ff:ff:ff:ff:ff
                    ip: 250:250:250:200
              hostname: foxhome-server
-                 name: foxhome-server
+                 name: foxhome, server
 
             interface: 
                        id: Bridge0
@@ -242,6 +242,7 @@ def dict_text(request):
                    ip: 250:250:250:224
              hostname: Chromecast-Audio
                  name: foxcast-bedroom
+          description: This is very long description with colon: foo
 
             interface: 
                        id: Bridge0
