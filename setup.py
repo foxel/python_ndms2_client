@@ -5,10 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="ndms2_client",
-    version="0.0.9",
+    version="0.0.10",
     author="Andrey F. Kupreychik",
     author_email="foxel@quickfox.ru",
-    description="Keenetic NDMS2 client",
+    description="Keenetic NDMS 2.x and 3.x client",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/foxel/python_ndms2_client",
