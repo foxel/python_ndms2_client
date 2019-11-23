@@ -1,7 +1,7 @@
 import logging
 import re
 from collections import namedtuple
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
 from .connection import Connection
 
@@ -13,7 +13,7 @@ _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
 _INTERFACE_CMD = 'show interface %s'
 _ARP_REGEX = re.compile(
-    r'(?P<name>([^ ]+))?\s+' +
+    r'(?P<name>.*?)\s+' +
     r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
     r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
     r'(?P<interface>([^ ]+))\s+'
@@ -67,7 +67,7 @@ class Client(object):
 
         return [Device(
             mac=info.get('mac').upper(),
-            name=info.get('name'),
+            name=info.get('name') or None,
             ip=info.get('ip'),
             interface=info.get('interface')
         ) for info in result if info.get('mac') is not None]
@@ -152,9 +152,9 @@ def _parse_table_lines(lines: List[str], regex: re) -> List[Dict[str, any]]:
 
 def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
     response = {}
-    stack = [(None, response)]
-    stack_level = 0
     indent = 0
+    stack = [(None, indent, response)]  # type: List[Tuple[str, int, Union[str, dict]]]
+    stack_level = 0
 
     for line in lines:
         if len(line.strip()) == 0:
@@ -181,25 +181,29 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
         # up and down the stack
         if new_indent > indent:  # new line is a sub-value of parent
             stack_level += 1
+            indent = new_indent
             stack.append(None)
-        elif new_indent < indent:  # getting one level up
-            stack_level -= 1
-            stack.pop()
+        else:
+            while new_indent < indent and len(stack) > 0:  # getting one level up
+                stack_level -= 1
+                stack.pop()
+                _, indent, _ = stack[stack_level]
 
         if stack_level < 1:
             break
 
-        indent = new_indent
-        stack[stack_level] = key, value
+        assert indent == new_indent, 'Irregular indentation detected'
+
+        stack[stack_level] = key, indent, value
 
         # current containing object
-        obj_key, obj = stack[stack_level - 1]
+        obj_key, obj_indent, obj = stack[stack_level - 1]
 
         # we are the first child of the containing object
         if not isinstance(obj, dict):
             # need to convert it from empty string to empty object
-            assert obj == ''
-            _, parent_obj = stack[stack_level - 2]
+            assert obj == '', 'Unexpected nested object format'
+            _, _, parent_obj = stack[stack_level - 2]
             obj = {}
 
             # containing object might be in a list also
@@ -208,7 +212,7 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
                 parent_obj[obj_key].append(obj)
             else:
                 parent_obj[obj_key] = obj
-            stack[stack_level - 1] = obj_key, obj
+            stack[stack_level - 1] = obj_key, obj_indent, obj
 
         # current key is already in object means there should be an array of values
         if key in obj:

@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Tuple
 
 import pytest
 
@@ -10,10 +11,26 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 def test_parse_dict_lines(dict_text):
     from ndms2_client.client import _parse_dict_lines
 
-    print(_parse_dict_lines(dict_text.split('\n')))
+    _parse_dict_lines(dict_text.split('\n'))
 
 
-@pytest.fixture(params=range(4))
+def test_hotspot_data(hostpot_sample: Tuple[str, int]):
+    from ndms2_client.client import _parse_dict_lines
+
+    sample, expected_hosts = hostpot_sample
+
+    parsed = _parse_dict_lines(sample.split('\n'))
+
+    print(parsed['host'])
+
+    if expected_hosts > 1:
+        assert isinstance(parsed['host'], list)
+        assert len(parsed['host']) == expected_hosts
+    else:
+        assert isinstance(parsed['host'], dict)
+
+
+@pytest.fixture(params=range(3))
 def dict_text(request):
     data = ['''
 
@@ -166,6 +183,100 @@ def dict_text(request):
 
 
 ''', '''
+
+               id: WifiMaster0/AccessPoint0
+            index: 0
+             type: AccessPoint
+      description: Wi-Fi access point
+   interface-name: AccessPoint
+             link: up
+        connected: yes
+            state: up
+              mtu: 1500
+         tx-queue: 1000
+            group: Home
+
+           usedby: Bridge0
+
+              mac: 00:ff:00:00:00:00
+        auth-type: none
+             ssid: home
+       encryption: wpa2,wpa3
+
+''']
+    return data[request.param]
+
+
+@pytest.fixture(params=range(2))
+def hostpot_sample(request) -> Tuple[str, int]:
+    samples = [
+        ('''
+        
+             host:
+                  mac: dc:09:xx:xx:xx:xx
+                  via: dc:09:xx:xx:xx:xx
+                   ip: 192.xx.xx.xx
+             hostname: xxxxxxxxxxxxx
+                 name: xxxxxxxxxxxxxxxxxx
+
+            interface:
+                       id: Bridge0
+                     name: Home
+              description: Home VLAN
+
+              expires: 181613
+           registered: yes
+               access: permit
+             schedule:
+               active: yes
+              rxbytes: 34442317
+              txbytes: 2176340
+               uptime: 59
+           first-seen: 157428
+            last-seen: 7
+                 link: up
+     auto-negotiation: yes
+                speed: 1000
+               duplex: yes
+            ever-seen: yes
+
+        traffic-shape:
+                       rx: 0
+                       tx: 0
+                     mode: mac
+                 schedule:
+
+             host:
+                  mac: 10:40:xx:xx:xx:xx
+                  via: 10:40:xx:xx:xx:xx
+                   ip: 192.xx.xx.xx
+             hostname: xxxxxxxxxxxxx
+                 name: xxxxxxxxxxxxxx
+
+            interface:
+                       id: Bridge0
+                     name: Home
+              description: Home VLAN
+
+              expires: 0
+           registered: yes
+               access: permit
+             schedule:
+               active: no
+              rxbytes: 0
+              txbytes: 0
+               uptime: 0
+                 link: down
+            ever-seen: yes
+
+        traffic-shape:
+                       rx: 0
+                       tx: 0
+                     mode: mac
+                 schedule:
+
+        ''', 2),
+        ('''
              host: 
                   mac: 74:ff:ff:ff:ff:ff
                   via: 74:ff:ff:ff:ff:ff
@@ -314,26 +425,7 @@ def dict_text(request):
 
            mac-access, id = Bridge0: permit
 
-''', '''
+        ''', 4)
+    ]
 
-               id: WifiMaster0/AccessPoint0
-            index: 0
-             type: AccessPoint
-      description: Wi-Fi access point
-   interface-name: AccessPoint
-             link: up
-        connected: yes
-            state: up
-              mtu: 1500
-         tx-queue: 1000
-            group: Home
-
-           usedby: Bridge0
-
-              mac: 00:ff:00:00:00:00
-        auth-type: none
-             ssid: home
-       encryption: wpa2,wpa3
-
-''']
-    return data[request.param]
+    return samples[request.param]
