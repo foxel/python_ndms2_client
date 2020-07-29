@@ -8,6 +8,7 @@ from .connection import Connection
 _LOGGER = logging.getLogger(__name__)
 
 
+_VERSION_CMD = 'show version'
 _ARP_CMD = 'show ip arp'
 _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
@@ -20,11 +21,38 @@ _ARP_REGEX = re.compile(
 )
 
 Device = namedtuple('Device', ['mac', 'name', 'ip', 'interface'])
+RouterInfo = namedtuple('RouterInfo', [
+    'name',
+    'fw_version',
+    'fw_channel',
+    'model',
+    'hw_version',
+    'manufacturer',
+    'vendor',
+    'region',
+])
 
 
 class Client(object):
     def __init__(self, connection: Connection):
         self._connection = connection
+
+    def get_router_info(self):
+        info = _parse_dict_lines(self._connection.run_command(_VERSION_CMD))
+
+        if not isinstance(info, dict):
+            return None
+
+        return RouterInfo(
+            name=str(info.get('description', info.get('model', 'NDMS2 Router'))),
+            fw_version=str(info.get('title', info.get('release'))),
+            fw_channel=str(info.get('sandbox', 'unknown')),
+            model=str(info.get('model', info.get('hw_id'))),
+            hw_version=str(info.get('hw_version', 'N/A')),
+            manufacturer=str(info.get('manufacturer')),
+            vendor=str(info.get('vendor')),
+            region=str(info.get('region', 'N/A')),
+        )
 
     def get_devices(self, *, try_hotspot=True, include_arp=True, include_associated=True) -> List[Device]:
         """
