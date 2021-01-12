@@ -30,7 +30,7 @@ def test_hotspot_data(hostpot_sample: Tuple[str, int]):
         assert isinstance(parsed['host'], dict)
 
 
-@pytest.fixture(params=range(3))
+@pytest.fixture(params=range(4))
 def dict_text(request):
     data = ['''
 
@@ -203,6 +203,38 @@ def dict_text(request):
              ssid: home
        encryption: wpa2,wpa3
 
+''', '''
+
+          release: v2.08(AAUR.4)C2
+             arch: mips
+              ndm: 
+                exact: 0-df82a04
+                cdate: 16 Oct 2017
+              bsp: 
+                exact: 0-02ec1b2
+                cdate: 16 Oct 2017
+              ndw: 
+              version: 4.2.0.166
+             features: wifi_button,single_usb_port,nopack,
+                       flexible_menu,emulate_firmware_progress
+           components: ddns,dot1x,interface-extras,kabinet,
+                       miniupnpd,nathelper-ftp,nathelper-h323,nathelper-pptp,
+                       nathelper-rtsp,nathelper-sip,ppe,trafficcontrol,usblte,
+                       usbserial,base,cloud,cloudcontrol,components,config-ap,
+                       config-client,config-repeater,corewireless,dhcpd,
+                       easyconfig,igmp,ipsec,l2tp,madwimax,pingcheck,ppp,pptp,
+                       pppoe,skydns,usb,usbdsl,usbmodem,usbnet,ydns,vpnserver,
+                       base-l10n,sysmode,easyconfig-3.2,modems,theme-ZyXEL-Intl,
+                       base-theme,ispdb,base-ZyXEL-Intl
+     manufacturer: ZyXEL
+           vendor: ZyXEL
+           series: Keenetic series
+            model: Keenetic
+       hw_version: 12131000-G
+            hw_id: kn_rg
+           device: Keenetic 4G III
+            class: Internet Center
+
 ''']
     return data[request.param]
 
@@ -353,7 +385,8 @@ def hostpot_sample(request) -> Tuple[str, int]:
                    ip: 250:250:250:224
              hostname: Chromecast-Audio
                  name: foxcast-bedroom
-          description: This is very long description with colon: foo
+          description: This is very long description with newline 
+                       and colon: foo
 
             interface: 
                        id: Bridge0

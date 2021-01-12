@@ -178,13 +178,38 @@ def _parse_table_lines(lines: List[str], regex: re) -> List[Dict[str, any]]:
     return results
 
 
+def _fix_continuation_lines(lines: List[str]) -> List[str]:
+    indent = 0
+    continuation_possible = False
+    fixed_lines = []  # type: List[str]
+    for line in lines:
+        if len(line.strip()) == 0:
+            continue
+
+        if continuation_possible and len(line[:indent].strip()) == 0:
+            prev_line = fixed_lines.pop()
+            line = prev_line.rstrip() + line[(indent + 1):].lstrip()
+        else:
+            assert ':' in line, 'Found a line with no colon when continuation is not possible: ' + line
+
+            colon_pos = line.index(':')
+            comma_pos = line.index(',') if ',' in line[:colon_pos] else None
+            indent = comma_pos if comma_pos is not None else colon_pos
+
+            continuation_possible = len(line[(indent + 1):].strip()) > 0
+
+        fixed_lines.append(line)
+
+    return fixed_lines
+
+
 def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
     response = {}
     indent = 0
     stack = [(None, indent, response)]  # type: List[Tuple[str, int, Union[str, dict]]]
     stack_level = 0
 
-    for line in lines:
+    for line in _fix_continuation_lines(lines):
         if len(line.strip()) == 0:
             continue
 
