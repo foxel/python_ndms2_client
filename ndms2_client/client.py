@@ -1,7 +1,7 @@
 import logging
 import re
 from collections import namedtuple
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, NamedTuple, Optional
 
 from .connection import Connection
 
@@ -20,28 +20,49 @@ _ARP_REGEX = re.compile(
     r'(?P<interface>([^ ]+))\s+'
 )
 
-Device = namedtuple('Device', ['mac', 'name', 'ip', 'interface'])
-RouterInfo = namedtuple('RouterInfo', [
-    'name',
-    'fw_version',
-    'fw_channel',
-    'model',
-    'hw_version',
-    'manufacturer',
-    'vendor',
-    'region',
-])
+
+class Device(NamedTuple):
+    mac: str
+    name: str
+    ip: str
+    interface: str
+
+
+class RouterInfo(NamedTuple):
+    name: str
+    fw_version: str
+    fw_channel: str
+    model: str
+    hw_version: str
+    manufacturer: str
+    vendor: str
+    region: str
+
+
+class InterfaceInfo(NamedTuple):
+    name: str
+    type: Optional[str]
+    description: Optional[str]
+    link: Optional[str]
+    connected: Optional[str]
+    state: Optional[str]
+    mtu: Optional[int]
+    address: Optional[str]
+    mask: Optional[str]
+    uptime: Optional[int]
+    security_level: Optional[str]
+    mac: Optional[str]
 
 
 class Client(object):
     def __init__(self, connection: Connection):
         self._connection = connection
 
-    def get_router_info(self):
+    def get_router_info(self) -> RouterInfo:
         info = _parse_dict_lines(self._connection.run_command(_VERSION_CMD))
 
-        if not isinstance(info, dict):
-            return None
+        _LOGGER.debug('Raw router info: %s', str(info))
+        assert isinstance(info, dict), 'Router info response is not a dictionary'
 
         return RouterInfo(
             name=str(info.get('description', info.get('model', 'NDMS2 Router'))),
@@ -52,6 +73,27 @@ class Client(object):
             manufacturer=str(info.get('manufacturer')),
             vendor=str(info.get('vendor')),
             region=str(info.get('region', 'N/A')),
+        )
+
+    def get_interface_info(self, interface_name) -> InterfaceInfo:
+        info = _parse_dict_lines(self._connection.run_command(_INTERFACE_CMD % interface_name))
+
+        _LOGGER.debug('Raw interface info: %s', str(info))
+        assert isinstance(info, dict), 'Interface info response is not a dictionary'
+
+        return InterfaceInfo(
+            name=_str(info.get('interface-name')) or _str(info.get('id')) or interface_name,
+            type=_str(info.get('type')),
+            description=_str(info.get('description')),
+            link=_str(info.get('link')),
+            connected=_str(info.get('connected')),
+            state=_str(info.get('state')),
+            mtu=_int(info.get('mtu')),
+            address=_str(info.get('address')),
+            mask=_str(info.get('mask')),
+            uptime=_int(info.get('uptime')),
+            security_level=_str(info.get('security-level')),
+            mac=_str(info.get('mac')),
         )
 
     def get_devices(self, *, try_hotspot=True, include_arp=True, include_associated=True) -> List[Device]:
@@ -145,6 +187,20 @@ class Client(object):
         return {item.get('mac'): item for item in items}
 
 
+def _str(value: Optional[any]) -> Optional[str]:
+    if value is None:
+        return None
+
+    return str(value)
+
+
+def _int(value: Optional[any]) -> Optional[int]:
+    if value is None:
+        return None
+
+    return int(value)
+
+
 def _merge_devices(*lists: List[Device]) -> List[Device]:
     res = {}
     for l in lists:
@@ -172,7 +228,7 @@ def _parse_table_lines(lines: List[str], regex: re) -> List[Dict[str, any]]:
     for line in lines:
         match = regex.search(line)
         if not match:
-            _LOGGER.debug("Could not parse line: %s", line)
+            _LOGGER.debug('Could not parse line: %s', line)
             continue
         results.append(match.groupdict())
     return results
@@ -212,6 +268,8 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
     for line in _fix_continuation_lines(lines):
         if len(line.strip()) == 0:
             continue
+
+        _LOGGER.debug(line)
 
         # exploding the line
         colon_pos = line.index(':')

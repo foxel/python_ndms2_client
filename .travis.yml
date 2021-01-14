@@ -1,7 +1,8 @@
 language: python
 python:
-  - '3.5'
   - '3.6'
+  - '3.7'
+  - '3.8'
 
 script: pytest
 
@@ -13,4 +14,4 @@ deploy:
     secure: HEScrNTTzpAN67SHgNIUH+Fo56K9EfAuSfnW9i3BIIo6Yf3qgFNPND1UeTDx+mMsYNo7RmCBmaqc8kzKt0j7mxsNMcQgHSvGUSdPd+RfMt9hfaRZcMPeZGKlh38TleRxsZoFAUCyGDap8CPq18xFWfSPQIxSyda3FdlfaE2SL4l4KRSh3kFWyR8p3UxRYpmjtt/NYxI3jcqR/+qzzW9IcTwQmeOh5WDdXy2kEfcsZxRIgfXQzHYjjxx9GwCRpv/NUiSDNHolOP6eacMbBriDCU1PSNX53kahCw8/WFuCT0jxFOJfAxmQ0xwFtkF4BZpwL2KPzeWommGcN1H+ogy6OgFiOwmZz3kZcYiARfhu7a4RFymr5D/529n+JhgMQRUxgkga1oPaMey6CBS74L6rLiZds1+Q3fgX9nqQ0u+hc6ior+AHIW6R/MPdoxLxsTfDrY4Qm6WT30kP9XnAxj80Ne61v736u/Sg4u92bJB1gQGuWI13bZtmNOE2zLJ0toX2GxzWP3Bn5Wqju5tiQNn+SqPTFzSDSNj8Y2XcoAYRTTHp/FgBYCvDM46HWWFbN9CVT76wwWBZSRtdoQyDinenJCrxG0EKv9dIikQEDd4VyIkqSwCHjAgaY2LHlznMjTCkypagYj0xQdIa+nlBafb3Y0PAuaPPAAR5Hl3d+QY+VOU=
   on:
     tags: true
-    python: '3.5'
+    python: '3.6'
