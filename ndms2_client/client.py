@@ -1,6 +1,5 @@
 import logging
 import re
-from collections import namedtuple
 from typing import Dict, List, Tuple, Union, NamedTuple, Optional
 
 from .connection import Connection

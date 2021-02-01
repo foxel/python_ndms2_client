@@ -1,7 +1,7 @@
 import logging
 import re
 from telnetlib import Telnet
-from typing import List
+from typing import List, Union, Pattern, Match
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,13 +37,13 @@ class TelnetConnection(Connection):
         self._username = username
         self._password = password
         self._timeout = timeout
-        self._prompt_string = None  # type: bytes
+        self._current_prompt_string = None  # type: bytes
 
     @property
     def connected(self):
         return self._telnet is not None
 
-    def run_command(self, command):
+    def run_command(self, command, *, group_change_expected=False) -> List[str]:
         """Run a command through a Telnet connection.
          Connect to the Telnet server if not currently connected, otherwise
          use the existing connection.
@@ -54,9 +54,8 @@ class TelnetConnection(Connection):
         try:
             self._telnet.read_very_eager()  # this is here to flush the read buffer
             self._telnet.write('{}\n'.format(command).encode('UTF-8'))
-            return self._read_until(self._prompt_string) \
-                       .decode('UTF-8') \
-                       .split('\n')[1:-1]
+            return self._read_response(group_change_expected)
+
         except Exception as e:
             message = "Error executing command: %s" % str(e)
             _LOGGER.error(message)
@@ -74,7 +73,7 @@ class TelnetConnection(Connection):
             self._read_until(b'Password: ')
             self._telnet.write((self._password + '\n').encode('UTF-8'))
 
-            self._prompt_string = self._read_until(b'>').split(b'\n')[-1]
+            self._read_response(True)
         except Exception as e:
             message = "Error connecting to telnet server: %s" % str(e)
             _LOGGER.error(message)
@@ -91,10 +90,18 @@ class TelnetConnection(Connection):
             pass
         self._telnet = None
 
-    def _read_until(self, needle: bytes):
-        (i, _, text) = self._telnet.expect([re.escape(needle)], self._timeout)
-        assert i is 0, "No expected response from server"
-        return text
+    def _read_response(self, detect_new_prompt_string=False) -> List[str]:
+        needle = re.compile(b'\\n\\(\\w+[-\\w]+\\)>') if detect_new_prompt_string else self._current_prompt_string
+        (match, text) = self._read_until(needle)
+        if detect_new_prompt_string:
+            self._current_prompt_string = match[0]
+        return text.decode('UTF-8').split('\n')[1:-1]
+
+    def _read_until(self, needle: Union[bytes, Pattern]) -> (Match, bytes):
+        matcher = needle if isinstance(needle, Pattern) else re.escape(needle)
+        (i, match, text) = self._telnet.expect([matcher], self._timeout)
+        assert i == 0, "No expected response from server"
+        return match, text
 
     # noinspection PyProtectedMember
     @staticmethod
