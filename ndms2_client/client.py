@@ -12,6 +12,7 @@ _ARP_CMD = 'show ip arp'
 _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
 _INTERFACE_CMD = 'show interface %s'
+_INTERFACES_CMD = 'show interface'
 _ARP_REGEX = re.compile(
     r'(?P<name>.*?)\s+' +
     r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
@@ -36,6 +37,19 @@ class RouterInfo(NamedTuple):
     manufacturer: str
     vendor: str
     region: str
+    
+    @classmethod
+    def from_dict(cls, info: dict) -> "RouterInfo":
+        return RouterInfo(
+            name=str(info.get('description', info.get('model', 'NDMS2 Router'))),
+            fw_version=str(info.get('title', info.get('release'))),
+            fw_channel=str(info.get('sandbox', 'unknown')),
+            model=str(info.get('model', info.get('hw_id'))),
+            hw_version=str(info.get('hw_version', 'N/A')),
+            manufacturer=str(info.get('manufacturer')),
+            vendor=str(info.get('vendor')),
+            region=str(info.get('region', 'N/A')),
+        )
 
 
 class InterfaceInfo(NamedTuple):
@@ -52,36 +66,10 @@ class InterfaceInfo(NamedTuple):
     security_level: Optional[str]
     mac: Optional[str]
 
-
-class Client(object):
-    def __init__(self, connection: Connection):
-        self._connection = connection
-
-    def get_router_info(self) -> RouterInfo:
-        info = _parse_dict_lines(self._connection.run_command(_VERSION_CMD))
-
-        _LOGGER.debug('Raw router info: %s', str(info))
-        assert isinstance(info, dict), 'Router info response is not a dictionary'
-
-        return RouterInfo(
-            name=str(info.get('description', info.get('model', 'NDMS2 Router'))),
-            fw_version=str(info.get('title', info.get('release'))),
-            fw_channel=str(info.get('sandbox', 'unknown')),
-            model=str(info.get('model', info.get('hw_id'))),
-            hw_version=str(info.get('hw_version', 'N/A')),
-            manufacturer=str(info.get('manufacturer')),
-            vendor=str(info.get('vendor')),
-            region=str(info.get('region', 'N/A')),
-        )
-
-    def get_interface_info(self, interface_name) -> InterfaceInfo:
-        info = _parse_dict_lines(self._connection.run_command(_INTERFACE_CMD % interface_name))
-
-        _LOGGER.debug('Raw interface info: %s', str(info))
-        assert isinstance(info, dict), 'Interface info response is not a dictionary'
-
+    @classmethod
+    def from_dict(cls, info: dict) -> "InterfaceInfo":
         return InterfaceInfo(
-            name=_str(info.get('interface-name')) or _str(info.get('id')) or interface_name,
+            name=_str(info.get('interface-name')) or str(info['id']),
             type=_str(info.get('type')),
             description=_str(info.get('description')),
             link=_str(info.get('link')),
@@ -94,6 +82,38 @@ class Client(object):
             security_level=_str(info.get('security-level')),
             mac=_str(info.get('mac')),
         )
+
+
+class Client(object):
+    def __init__(self, connection: Connection):
+        self._connection = connection
+
+    def get_router_info(self) -> RouterInfo:
+        info = _parse_dict_lines(self._connection.run_command(_VERSION_CMD))
+
+        _LOGGER.debug('Raw router info: %s', str(info))
+        assert isinstance(info, dict), 'Router info response is not a dictionary'
+        
+        return RouterInfo.from_dict(info)
+
+    def get_interfaces(self) -> List[InterfaceInfo]:
+        collection = _parse_collection_lines(self._connection.run_command(_INTERFACES_CMD))
+
+        _LOGGER.debug('Raw interfaces info: %s', str(collection))
+        assert isinstance(collection, list), 'Interfaces info response is not a collection'
+
+        return [InterfaceInfo.from_dict(info) for info in collection]
+
+    def get_interface_info(self, interface_name) -> Optional[InterfaceInfo]:
+        info = _parse_dict_lines(self._connection.run_command(_INTERFACE_CMD % interface_name))
+
+        _LOGGER.debug('Raw interface info: %s', str(info))
+        assert isinstance(info, dict), 'Interface info response is not a dictionary'
+
+        if 'id' in info:
+            return InterfaceInfo.from_dict(info)
+
+        return None
 
     def get_devices(self, *, try_hotspot=True, include_arp=True, include_associated=True) -> List[Device]:
         """
@@ -334,3 +354,26 @@ def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
             obj[key] = value
 
     return response
+
+
+def _parse_collection_lines(lines: List[str]) -> List[Dict[str, any]]:
+    _HEADER_REGEXP = re.compile(r'^(\w+),\s*name\s*=\s*\"([^"]+)\"')
+
+    result = []
+    item_lines = []  # type: List[str]
+    for line in lines:
+        if len(line.strip()) == 0:
+            continue
+
+        match = _HEADER_REGEXP.match(line)
+        if match:
+            if len(item_lines) > 0:
+                result.append(_parse_dict_lines(item_lines))
+                item_lines = []
+        else:
+            item_lines.append(line)
+
+    if len(item_lines) > 0:
+        result.append(_parse_dict_lines(item_lines))
+
+    return result

@@ -28,7 +28,7 @@ class Connection(object):
 class TelnetConnection(Connection):
     """Maintains a Telnet connection to a router."""
 
-    def __init__(self, host: str, port: int, username: str, password: str,
+    def __init__(self, host: str, port: int, username: str, password: str, *,
                  timeout: int = 30):
         """Initialize the Telnet connection properties."""
         self._telnet = None  # type: Telnet
@@ -54,13 +54,15 @@ class TelnetConnection(Connection):
         try:
             self._telnet.read_very_eager()  # this is here to flush the read buffer
             self._telnet.write('{}\n'.format(command).encode('UTF-8'))
-            return self._read_response(group_change_expected)
-
+            response = self._read_response(group_change_expected)
         except Exception as e:
             message = "Error executing command: %s" % str(e)
             _LOGGER.error(message)
             self.disconnect()
             raise ConnectionException(message) from None
+        else:
+            _LOGGER.debug('Command %s: %s', command, '\n'.join(response))
+            return response
 
     def connect(self):
         """Connect to the Telnet server."""
@@ -91,7 +93,7 @@ class TelnetConnection(Connection):
         self._telnet = None
 
     def _read_response(self, detect_new_prompt_string=False) -> List[str]:
-        needle = re.compile(b'\\n\\(\\w+[-\\w]+\\)>') if detect_new_prompt_string else self._current_prompt_string
+        needle = re.compile(br'\n\(\w+[-\w]+\)>') if detect_new_prompt_string else self._current_prompt_string
         (match, text) = self._read_until(needle)
         if detect_new_prompt_string:
             self._current_prompt_string = match[0]
