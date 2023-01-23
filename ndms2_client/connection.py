@@ -67,8 +67,9 @@ class TelnetConnection(Connection):
     def connect(self):
         """Connect to the Telnet server."""
         try:
-            self._telnet = Telnet(self._host, self._port, self._timeout)
-            self._telnet.set_option_negotiation_callback(TelnetConnection.__set_max_window_size)
+            self._telnet = Telnet()
+            self._telnet.set_option_negotiation_callback(TelnetConnection.__negotiate_naws)
+            self._telnet.open(self._host, self._port, self._timeout)
 
             self._read_until(b'Login: ')
             self._telnet.write((self._username + '\n').encode('UTF-8'))
@@ -76,6 +77,7 @@ class TelnetConnection(Connection):
             self._telnet.write((self._password + '\n').encode('UTF-8'))
 
             self._read_response(True)
+            self._set_max_window_size()
         except Exception as e:
             message = "Error connecting to telnet server: %s" % str(e)
             _LOGGER.error(message)
@@ -106,29 +108,34 @@ class TelnetConnection(Connection):
         return match, text
 
     # noinspection PyProtectedMember
-    @staticmethod
-    def __set_max_window_size(tsocket, command, option):
+    def _set_max_window_size(self):
         """
-        Set Window size to resolve line width issue
-        Set Windows size command: IAC SB NAWS <16-bit value> <16-bit value> IAC SE
-        --> inform the Telnet server of the window width and height.
+        --> inform the Telnet server of the window width and height. see __negotiate_naws
+        """
+        from telnetlib import IAC, NAWS, SB, SE
+        import struct
+
+        width = struct.pack('H', 65000)
+        height = struct.pack('H', 5000)
+        self._telnet.get_socket().sendall(IAC + SB + NAWS + width + height + IAC + SE)
+
+    # noinspection PyProtectedMember
+    @staticmethod
+    def __negotiate_naws(tsocket, command, option):
+        """
+        --> inform the Telnet server we'll be using Window Size Option.
         Refer to https://www.ietf.org/rfc/rfc1073.txt
         :param tsocket: telnet socket object
         :param command: telnet Command
         :param option: telnet option
         :return: None
         """
-        from telnetlib import DO, DONT, IAC, WILL, WONT, NAWS, SB, SE
-        import struct
+        from telnetlib import DO, DONT, IAC, WILL, WONT, NAWS
 
         if option == NAWS:
-            width = struct.pack('H', 65000)
-            height = struct.pack('H', 5000)
-            tsocket.send(IAC + WILL + NAWS)
-            tsocket.send(IAC + SB + NAWS + width + height + IAC + SE)
-        # -- below code taken from telnetlib source
+            tsocket.sendall(IAC + WILL + NAWS)
+        # -- below code taken from telnetlib
         elif command in (DO, DONT):
-            tsocket.send(IAC + WONT + option)
+            tsocket.sendall(IAC + WONT + option)
         elif command in (WILL, WONT):
-            tsocket.send(IAC + DONT + option)
-
+            tsocket.sendall(IAC + DONT + option)
