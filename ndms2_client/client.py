@@ -3,22 +3,9 @@ import re
 from typing import Dict, List, Tuple, Union, NamedTuple, Optional
 
 from .connection import Connection
+from .command import Command
 
 _LOGGER = logging.getLogger(__name__)
-
-
-_VERSION_CMD = 'show version'
-_ARP_CMD = 'show ip arp'
-_ASSOCIATIONS_CMD = 'show associations'
-_HOTSPOT_CMD = 'show ip hotspot'
-_INTERFACE_CMD = 'show interface %s'
-_INTERFACES_CMD = 'show interface'
-_ARP_REGEX = re.compile(
-    r'(?P<name>.*?)\s+' +
-    r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
-    r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
-    r'(?P<interface>([^ ]+))\s+'
-)
 
 
 class Device(NamedTuple):
@@ -26,6 +13,25 @@ class Device(NamedTuple):
     name: str
     ip: str
     interface: str
+
+    @staticmethod
+    def merge_devices(*lists: List["Device"]) -> List["Device"]:
+        res = {}
+        for l in lists:
+            for dev in l:
+                key = (dev.interface, dev.mac)
+                if key in res:
+                    old_dev = res.get(key)
+                    res[key] = Device(
+                        mac=old_dev.mac,
+                        name=old_dev.name or dev.name,
+                        ip=old_dev.ip or dev.ip,
+                        interface=old_dev.interface
+                    )
+                else:
+                    res[key] = dev
+
+        return list(res.values())
 
 
 class RouterInfo(NamedTuple):
@@ -89,7 +95,7 @@ class Client(object):
         self._connection = connection
 
     def get_router_info(self) -> RouterInfo:
-        info = _parse_dict_lines(self._connection.run_command(_VERSION_CMD))
+        info = self._connection.run_command(Command.VERSION)
 
         _LOGGER.debug('Raw router info: %s', str(info))
         assert isinstance(info, dict), 'Router info response is not a dictionary'
@@ -97,7 +103,7 @@ class Client(object):
         return RouterInfo.from_dict(info)
 
     def get_interfaces(self) -> List[InterfaceInfo]:
-        collection = _parse_collection_lines(self._connection.run_command(_INTERFACES_CMD))
+        collection = self._connection.run_command(Command.INTERFACES)
 
         _LOGGER.debug('Raw interfaces info: %s', str(collection))
         assert isinstance(collection, list), 'Interfaces info response is not a collection'
@@ -105,7 +111,7 @@ class Client(object):
         return [InterfaceInfo.from_dict(info) for info in collection]
 
     def get_interface_info(self, interface_name) -> Optional[InterfaceInfo]:
-        info = _parse_dict_lines(self._connection.run_command(_INTERFACE_CMD % interface_name))
+        info = self._connection.run_command(Command.INTERFACE, name=interface_name)
 
         _LOGGER.debug('Raw interface info: %s', str(info))
         assert isinstance(info, dict), 'Interface info response is not a dictionary'
@@ -127,15 +133,15 @@ class Client(object):
         devices = []
 
         if try_hotspot:
-            devices = _merge_devices(devices, self.get_hotspot_devices())
+            devices = Device.merge_devices(devices, self.get_hotspot_devices())
             if len(devices) > 0:
                 return devices
 
         if include_arp:
-            devices = _merge_devices(devices, self.get_arp_devices())
+            devices = Device.merge_devices(devices, self.get_arp_devices())
 
         if include_associated:
-            devices = _merge_devices(devices, self.get_associated_devices())
+            devices = Device.merge_devices(devices, self.get_associated_devices())
 
         return devices
 
@@ -150,9 +156,7 @@ class Client(object):
         ) for info in hotspot_info.values() if 'interface' in info and info.get('link') == 'up']
 
     def get_arp_devices(self) -> List[Device]:
-        lines = self._connection.run_command(_ARP_CMD)
-
-        result = _parse_table_lines(lines, _ARP_REGEX)
+        result = self._connection.run_command(Command.ARP)
 
         return [Device(
             mac=info.get('mac').upper(),
@@ -162,7 +166,7 @@ class Client(object):
         ) for info in result if info.get('mac') is not None]
 
     def get_associated_devices(self):
-        associations = _parse_dict_lines(self._connection.run_command(_ASSOCIATIONS_CMD))
+        associations = self._connection.run_command(Command.ASSOCIATIONS)
 
         items = associations.get('station', [])
         if not isinstance(items, list):
@@ -172,7 +176,7 @@ class Client(object):
 
         ap_to_bridge = {}
         for ap in aps:
-            ap_info = _parse_dict_lines(self._connection.run_command(_INTERFACE_CMD % ap))
+            ap_info = self._connection.run_command(Command.INTERFACE, name=ap)
             ap_to_bridge[ap] = ap_info.get('group') or ap_info.get('interface-name')
 
         # try enriching the results with hotspot additional info
@@ -197,7 +201,7 @@ class Client(object):
     # hotspot info is only available in newest firmware (2.09 and up) and in router mode
     # however missing command error will lead to empty dict returned
     def __get_hotspot_info(self):
-        info = _parse_dict_lines(self._connection.run_command(_HOTSPOT_CMD))
+        info = self._connection.run_command(Command.HOTSPOT)
 
         items = info.get('host', [])
         if not isinstance(items, list):
@@ -218,162 +222,3 @@ def _int(value: Optional[any]) -> Optional[int]:
         return None
 
     return int(value)
-
-
-def _merge_devices(*lists: List[Device]) -> List[Device]:
-    res = {}
-    for l in lists:
-        for dev in l:
-            key = (dev.interface, dev.mac)
-            if key in res:
-                old_dev = res.get(key)
-                res[key] = Device(
-                    mac=old_dev.mac,
-                    name=old_dev.name or dev.name,
-                    ip=old_dev.ip or dev.ip,
-                    interface=old_dev.interface
-                )
-            else:
-                res[key] = dev
-
-    return list(res.values())
-
-
-def _parse_table_lines(lines: List[str], regex: re) -> List[Dict[str, any]]:
-    """Parse the lines using the given regular expression.
-     If a line can't be parsed it is logged and skipped in the output.
-    """
-    results = []
-    for line in lines:
-        match = regex.search(line)
-        if not match:
-            _LOGGER.debug('Could not parse line: %s', line)
-            continue
-        results.append(match.groupdict())
-    return results
-
-
-def _fix_continuation_lines(lines: List[str]) -> List[str]:
-    indent = 0
-    continuation_possible = False
-    fixed_lines = []  # type: List[str]
-    for line in lines:
-        if len(line.strip()) == 0:
-            continue
-
-        if continuation_possible and len(line[:indent].strip()) == 0:
-            prev_line = fixed_lines.pop()
-            line = prev_line.rstrip() + line[(indent + 1):].lstrip()
-        else:
-            assert ':' in line, 'Found a line with no colon when continuation is not possible: ' + line
-
-            colon_pos = line.index(':')
-            comma_pos = line.index(',') if ',' in line[:colon_pos] else None
-            indent = comma_pos if comma_pos is not None else colon_pos
-
-            continuation_possible = len(line[(indent + 1):].strip()) > 0
-
-        fixed_lines.append(line)
-
-    return fixed_lines
-
-
-def _parse_dict_lines(lines: List[str]) -> Dict[str, any]:
-    response = {}
-    indent = 0
-    stack = [(None, indent, response)]  # type: List[Tuple[str, int, Union[str, dict]]]
-    stack_level = 0
-
-    for line in _fix_continuation_lines(lines):
-        if len(line.strip()) == 0:
-            continue
-
-        _LOGGER.debug(line)
-
-        # exploding the line
-        colon_pos = line.index(':')
-        comma_pos = line.index(',') if ',' in line[:colon_pos] else None
-        key = line[:colon_pos].strip()
-        value = line[(colon_pos + 1):].strip()
-        new_indent = comma_pos if comma_pos is not None else colon_pos
-
-        # assuming line is like 'mac-access, id = Bridge0: ...'
-        if comma_pos is not None:
-            key = line[:comma_pos].strip()
-
-            value = {key: value} if value != '' else {}
-
-            args = line[comma_pos + 1:colon_pos].split(',')
-            for arg in args:
-                sub_key, sub_value = [p.strip() for p in arg.split('=', 1)]
-                value[sub_key] = sub_value
-
-        # up and down the stack
-        if new_indent > indent:  # new line is a sub-value of parent
-            stack_level += 1
-            indent = new_indent
-            stack.append(None)
-        else:
-            while new_indent < indent and len(stack) > 0:  # getting one level up
-                stack_level -= 1
-                stack.pop()
-                _, indent, _ = stack[stack_level]
-
-        if stack_level < 1:
-            break
-
-        assert indent == new_indent, 'Irregular indentation detected'
-
-        stack[stack_level] = key, indent, value
-
-        # current containing object
-        obj_key, obj_indent, obj = stack[stack_level - 1]
-
-        # we are the first child of the containing object
-        if not isinstance(obj, dict):
-            # need to convert it from empty string to empty object
-            assert obj == '', 'Unexpected nested object format'
-            _, _, parent_obj = stack[stack_level - 2]
-            obj = {}
-
-            # containing object might be in a list also
-            if isinstance(parent_obj[obj_key], list):
-                parent_obj[obj_key].pop()
-                parent_obj[obj_key].append(obj)
-            else:
-                parent_obj[obj_key] = obj
-            stack[stack_level - 1] = obj_key, obj_indent, obj
-
-        # current key is already in object means there should be an array of values
-        if key in obj:
-            if not isinstance(obj[key], list):
-                obj[key] = [obj[key]]
-
-            obj[key].append(value)
-        else:
-            obj[key] = value
-
-    return response
-
-
-def _parse_collection_lines(lines: List[str]) -> List[Dict[str, any]]:
-    _HEADER_REGEXP = re.compile(r'^(\w+),\s*name\s*=\s*\"([^"]+)\"')
-
-    result = []
-    item_lines = []  # type: List[str]
-    for line in lines:
-        if len(line.strip()) == 0:
-            continue
-
-        match = _HEADER_REGEXP.match(line)
-        if match:
-            if len(item_lines) > 0:
-                result.append(_parse_dict_lines(item_lines))
-                item_lines = []
-        else:
-            item_lines.append(line)
-
-    if len(item_lines) > 0:
-        result.append(_parse_dict_lines(item_lines))
-
-    return result
