@@ -1,8 +1,11 @@
 import logging
 import re
 from telnetlib import Telnet
-from typing import List, Union, Pattern, Match, Dict, Optional
-from .command import Command
+from typing import List, Dict, Union, Optional
+
+from ..command import Command
+from .base import ResponseConverter, Connection, ConnectionException
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -12,11 +15,6 @@ _ARP_REGEX = re.compile(
     r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
     r'(?P<interface>([^ ]+))\s+'
 )
-
-
-class ResponseConverter:
-    def convert(self, command, data):
-        raise NotImplementedError("Should have implemented this")
 
 
 class TelnetResponseConverter(ResponseConverter):
@@ -172,25 +170,6 @@ class TelnetResponseConverter(ResponseConverter):
         return result
 
 
-class ConnectionException(Exception):
-    pass
-
-
-class Connection(object):
-    @property
-    def connected(self) -> bool:
-        raise NotImplementedError("Should have implemented this")
-
-    def connect(self):
-        raise NotImplementedError("Should have implemented this")
-
-    def disconnect(self):
-        raise NotImplementedError("Should have implemented this")
-
-    def run_command(self, command: Command, *, name: str = None) -> List[str]:
-        raise NotImplementedError("Should have implemented this")
-
-
 class TelnetConnection(Connection):
     """Maintains a Telnet connection to a router."""
 
@@ -273,8 +252,8 @@ class TelnetConnection(Connection):
             self._current_prompt_string = match[0]
         return text.decode('UTF-8').split('\n')[1:-1]
 
-    def _read_until(self, needle: Union[bytes, Pattern]) -> (Match, bytes):
-        matcher = needle if isinstance(needle, Pattern) else re.escape(needle)
+    def _read_until(self, needle: Union[bytes, re.Pattern]) -> (re.Match, bytes):
+        matcher = needle if isinstance(needle, re.Pattern) else re.escape(needle)
         (i, match, text) = self._telnet.expect([matcher], self._timeout)
         assert i == 0, "No expected response from server"
         return match, text
