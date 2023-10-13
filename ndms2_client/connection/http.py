@@ -1,10 +1,15 @@
 import hashlib
+import http
+import json
 import logging
-from typing import Optional, List
+from contextlib import suppress
+from urllib import request
+from urllib.error import HTTPError
+
+from typing import List
 
 from .base import ResponseConverter, ConnectionException, Connection
 from ..command import Command
-from requests import Session, Response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +26,6 @@ class HttpConnection(Connection):
     def __init__(
         self, host: str, port: int, username: str, password: str, *, scheme: str = "http", timeout: int = 30, response_converter: ResponseConverter = None
     ):
-        self._session = Session()
         self._scheme = scheme
         self._host = host
         self._port = port
@@ -30,30 +34,39 @@ class HttpConnection(Connection):
         self._timeout = timeout
         self._auth_url = f'{scheme}://{self._host}:{self._port}/auth'
         self._converter = response_converter
+        self._cookie_jar = http.cookiejar.CookieJar()
+        opener = request.build_opener(request.HTTPCookieProcessor(self._cookie_jar))
+        request.install_opener(opener)
 
     @property
     def connected(self) -> bool:
-        r = self._session.get(self._auth_url)
-        return r.status_code == 200
+        with suppress(HTTPError):
+            r = request.urlopen(self._auth_url)
+            return r.status_code == 200
+        return False
 
     def connect(self):
-        response: Optional[Response] = None
+        response = None
         try:
-            response = self._session.get(self._auth_url)
-            if response.ok:
-                return
-            if response.status_code == 401:
-                realm, challenge = response.headers['X-NDM-Realm'], response.headers['X-NDM-Challenge']
-                md5 = hashlib.md5(f"{self._username}:{realm}:{self._password}".encode())
-                sha = hashlib.sha256(f"{challenge}{md5.hexdigest()}".encode())
-                response = self._session.post(
-                    self._auth_url, json={
-                        "login": self._username,
-                        "password": sha.hexdigest()
-                    }
+            try:
+                request.urlopen(self._auth_url)
+            except HTTPError as error:
+                realm = error.headers.get('X-NDM-Realm')
+                challenge = error.headers.get('X-NDM-Challenge')
+
+                md5 = hashlib.md5(f"admin:{realm}:Gluten-Bakery4-Jailer".encode()).hexdigest()
+                sha = hashlib.sha256(f"{challenge}{md5}".encode()).hexdigest()
+
+                req = request.Request(
+                    self._auth_url,
+                    method='POST',
+                    data=json.dumps({"login": "admin", "password": sha}).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
                 )
-                if response.status_code == 200:
+                response = request.urlopen(req)
+                if response.status == 200:
                     return
+
         except Exception as e:
             message = "Error connecting to api server: %s" % str(e)
             if response is not None:
@@ -62,7 +75,7 @@ class HttpConnection(Connection):
             raise ConnectionException(message) from None
 
     def disconnect(self):
-        self._session.delete(self._auth_url)
+        self._cookie_jar.clear()
 
     def run_command(self, command: Command, name: str = None) -> List[str]:
         if not self.connected:
@@ -72,7 +85,8 @@ class HttpConnection(Connection):
             if '/' in name:
                 name, *_ = name.split("/")
             cmd = cmd % name
-        response = self._session.get(f'{self._scheme}://{self._host}:{self._port}/rci/{cmd}/')
+        response = request.urlopen(f'{self._scheme}://{self._host}:{self._port}/rci/{cmd}/')
+        response = json.loads(response.read())
         if self._converter:
-            return self._converter.convert(command, response.json())
-        return response.json()
+            return self._converter.convert(command, response)
+        return response
