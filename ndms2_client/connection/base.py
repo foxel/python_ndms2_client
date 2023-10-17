@@ -1,27 +1,32 @@
+from abc import ABC, abstractmethod
 from typing import List
-
 from ndms2_client.command import Command
 
 
-class ResponseConverter:
+class ResponseConverter(ABC):
+    @abstractmethod
     def convert(self, command, data):
-        raise NotImplementedError("Should have implemented this")
+        ...
 
 
 class ConnectionException(Exception):
     pass
 
 
-class Connection(object):
+class Connection(ABC):
     @property
+    @abstractmethod
     def connected(self) -> bool:
-        raise NotImplementedError("Should have implemented this")
+        ...
 
+    @abstractmethod
     def connect(self):
-        raise NotImplementedError("Should have implemented this")
+        ...
 
+    @abstractmethod
     def disconnect(self):
-        raise NotImplementedError("Should have implemented this")
+        ...
 
+    @abstractmethod
     def run_command(self, command: Command, *, name: str = None) -> List[str]:
-        raise NotImplementedError("Should have implemented this")
+        ...
