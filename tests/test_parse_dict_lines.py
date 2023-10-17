@@ -4,35 +4,34 @@ from typing import Tuple
 
 import pytest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 # noinspection PyProtectedMember
 def test_parse_dict_lines(dict_text):
-    from ndms2_client.client import _parse_dict_lines
+    from ndms2_client.connection.telnet import _parse_dict_lines
 
-    _parse_dict_lines(dict_text.split('\n'))
+    _parse_dict_lines(dict_text.split("\n"))
 
 
 def test_hotspot_data(hostpot_sample: Tuple[str, int]):
-    from ndms2_client.client import _parse_dict_lines
+    from ndms2_client.connection.telnet import _parse_dict_lines
 
     sample, expected_hosts = hostpot_sample
 
-    parsed = _parse_dict_lines(sample.split('\n'))
-
-    print(parsed['host'])
+    parsed = _parse_dict_lines(sample.split("\n"))
 
     if expected_hosts > 1:
-        assert isinstance(parsed['host'], list)
-        assert len(parsed['host']) == expected_hosts
+        assert isinstance(parsed["host"], list)
+        assert len(parsed["host"]) == expected_hosts
     else:
-        assert isinstance(parsed['host'], dict)
+        assert isinstance(parsed["host"], dict)
 
 
 @pytest.fixture(params=range(4))
 def dict_text(request):
-    data = ['''
+    data = [
+        """
 
           station: 
                   mac: 60:ff:ff:ff:ff:ff
@@ -146,7 +145,8 @@ def dict_text(request):
                   mcs: 9
                  txss: 1
 
-''', '''
+""",
+        """
 
           buttons: 
                button, name = RESET: 
@@ -182,7 +182,8 @@ def dict_text(request):
                hold_delay: 3000
 
 
-''', '''
+""",
+        """
 
                id: WifiMaster0/AccessPoint0
             index: 0
@@ -203,7 +204,8 @@ def dict_text(request):
              ssid: home
        encryption: wpa2,wpa3
 
-''', '''
+""",
+        """
 
           release: v2.08(AAUR.4)C2
              arch: mips
@@ -235,14 +237,16 @@ def dict_text(request):
            device: Keenetic 4G III
             class: Internet Center
 
-''']
+""",
+    ]
     return data[request.param]
 
 
 @pytest.fixture(params=range(2))
 def hostpot_sample(request) -> Tuple[str, int]:
     samples = [
-        ('''
+        (
+            """
         
              host:
                   mac: dc:09:xx:xx:xx:xx
@@ -307,8 +311,11 @@ def hostpot_sample(request) -> Tuple[str, int]:
                      mode: mac
                  schedule:
 
-        ''', 2),
-        ('''
+        """,
+            2,
+        ),
+        (
+            """
              host: 
                   mac: 74:ff:ff:ff:ff:ff
                   via: 74:ff:ff:ff:ff:ff
@@ -458,7 +465,9 @@ def hostpot_sample(request) -> Tuple[str, int]:
 
            mac-access, id = Bridge0: permit
 
-        ''', 4)
+        """,
+            4,
+        ),
     ]
 
     return samples[request.param]
