@@ -40,7 +40,11 @@ class Client(object):
         return None
 
     def get_devices(
-        self, *, try_hotspot=True, include_arp=True, include_associated=True
+        self,
+        *,
+        try_hotspot=True,
+        include_arp=True,
+        include_associated=True,
     ) -> List[Device]:
         """
         Fetches a list of connected devices online
@@ -123,7 +127,7 @@ class Client(object):
                         name=host_info.get("name") if host_info else None,
                         ip=host_info.get("ip") if host_info else None,
                         interface=ap_to_bridge.get(info.get("ap"), info.get("ap")),
-                    )
+                    ),
                 )
 
         return devices

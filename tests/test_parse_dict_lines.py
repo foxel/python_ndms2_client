@@ -9,19 +9,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 # noinspection PyProtectedMember
 def test_parse_dict_lines(dict_text):
-    from ndms2_client.client import _parse_dict_lines
+    from ndms2_client.connection.telnet import _parse_dict_lines
 
     _parse_dict_lines(dict_text.split("\n"))
 
 
 def test_hotspot_data(hostpot_sample: Tuple[str, int]):
-    from ndms2_client.client import _parse_dict_lines
+    from ndms2_client.connection.telnet import _parse_dict_lines
 
     sample, expected_hosts = hostpot_sample
 
     parsed = _parse_dict_lines(sample.split("\n"))
-
-    print(parsed["host"])
 
     if expected_hosts > 1:
         assert isinstance(parsed["host"], list)

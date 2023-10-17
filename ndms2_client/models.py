@@ -10,8 +10,8 @@ class Device(NamedTuple):
     @staticmethod
     def merge_devices(*lists: List["Device"]) -> List["Device"]:
         res = {}
-        for l in lists:
-            for dev in l:
+        for list_ in lists:
+            for dev in list_:
                 key = (dev.interface, dev.mac)
                 if key in res:
                     old_dev = res.get(key)
