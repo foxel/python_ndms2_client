@@ -1,3 +1,3 @@
-from .connection import Connection, ConnectionException, TelnetConnection, TelnetResponseConverter
 from .client import Client
-from .models import Device, RouterInfo, InterfaceInfo
+from .connection import Connection, ConnectionException, HttpConnection, TelnetConnection
+from .models import Device, InterfaceInfo, RouterInfo

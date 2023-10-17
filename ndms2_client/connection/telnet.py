@@ -1,19 +1,18 @@
 import logging
 import re
 from telnetlib import Telnet
-from typing import List, Dict, Union, Optional
+from typing import Dict, List, Optional, Union
 
 from ..command import Command
-from .base import ResponseConverter, Connection, ConnectionException
-
+from .base import Connection, ConnectionException, ResponseConverter
 
 _LOGGER = logging.getLogger(__name__)
 
 _ARP_REGEX = re.compile(
-    r'(?P<name>.*?)\s+' +
-    r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
-    r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
-    r'(?P<interface>([^ ]+))\s+'
+    r"(?P<name>.*?)\s+"
+    + r"(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+"
+    + r"(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+"
+    + r"(?P<interface>([^ ]+))\s+"
 )
 
 
@@ -35,13 +34,13 @@ class TelnetResponseConverter(ResponseConverter):
 
     def _parse_table_lines(self, lines: List[str]) -> List[Dict[str, any]]:
         """Parse the lines using the given regular expression.
-         If a line can't be parsed it is logged and skipped in the output.
+        If a line can't be parsed it is logged and skipped in the output.
         """
         results = []
         for line in lines:
             match = _ARP_REGEX.search(line)
             if not match:
-                _LOGGER.debug('Could not parse line: %s', line)
+                _LOGGER.debug("Could not parse line: %s", line)
                 continue
             results.append(match.groupdict())
         return results
@@ -56,15 +55,17 @@ class TelnetResponseConverter(ResponseConverter):
 
             if continuation_possible and len(line[:indent].strip()) == 0:
                 prev_line = fixed_lines.pop()
-                line = prev_line.rstrip() + line[(indent + 1):].lstrip()
+                line = prev_line.rstrip() + line[(indent + 1) :].lstrip()
             else:
-                assert ':' in line, 'Found a line with no colon when continuation is not possible: ' + line
+                assert ":" in line, (
+                    "Found a line with no colon when continuation is not possible: " + line
+                )
 
-                colon_pos = line.index(':')
-                comma_pos = line.index(',') if ',' in line[:colon_pos] else None
+                colon_pos = line.index(":")
+                comma_pos = line.index(",") if "," in line[:colon_pos] else None
                 indent = comma_pos if comma_pos is not None else colon_pos
 
-                continuation_possible = len(line[(indent + 1):].strip()) > 0
+                continuation_possible = len(line[(indent + 1) :].strip()) > 0
 
             fixed_lines.append(line)
 
@@ -83,21 +84,21 @@ class TelnetResponseConverter(ResponseConverter):
             _LOGGER.debug(line)
 
             # exploding the line
-            colon_pos = line.index(':')
-            comma_pos = line.index(',') if ',' in line[:colon_pos] else None
+            colon_pos = line.index(":")
+            comma_pos = line.index(",") if "," in line[:colon_pos] else None
             key = line[:colon_pos].strip()
-            value = line[(colon_pos + 1):].strip()
+            value = line[(colon_pos + 1) :].strip()
             new_indent = comma_pos if comma_pos is not None else colon_pos
 
             # assuming line is like 'mac-access, id = Bridge0: ...'
             if comma_pos is not None:
                 key = line[:comma_pos].strip()
 
-                value = {key: value} if value != '' else {}
+                value = {key: value} if value != "" else {}
 
-                args = line[comma_pos + 1:colon_pos].split(',')
+                args = line[comma_pos + 1 : colon_pos].split(",")
                 for arg in args:
-                    sub_key, sub_value = [p.strip() for p in arg.split('=', 1)]
+                    sub_key, sub_value = [p.strip() for p in arg.split("=", 1)]
                     value[sub_key] = sub_value
 
             # up and down the stack
@@ -114,7 +115,7 @@ class TelnetResponseConverter(ResponseConverter):
             if stack_level < 1:
                 break
 
-            assert indent == new_indent, 'Irregular indentation detected'
+            assert indent == new_indent, "Irregular indentation detected"
 
             stack[stack_level] = key, indent, value
 
@@ -124,7 +125,7 @@ class TelnetResponseConverter(ResponseConverter):
             # we are the first child of the containing object
             if not isinstance(obj, dict):
                 # need to convert it from empty string to empty object
-                assert obj == '', 'Unexpected nested object format'
+                assert obj == "", "Unexpected nested object format"
                 _, _, parent_obj = stack[stack_level - 2]
                 obj = {}
 
@@ -173,8 +174,16 @@ class TelnetResponseConverter(ResponseConverter):
 class TelnetConnection(Connection):
     """Maintains a Telnet connection to a router."""
 
-    def __init__(self, host: str, port: int, username: str, password: str, *,
-                 timeout: int = 30, response_converter: Optional[ResponseConverter] = None):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        *,
+        timeout: int = 30,
+        response_converter: Optional[ResponseConverter] = None
+    ):
         """Initialize the Telnet connection properties."""
         self._telnet = None  # type: Telnet
         self._host = host
@@ -183,7 +192,7 @@ class TelnetConnection(Connection):
         self._password = password
         self._timeout = timeout
         self._current_prompt_string = None  # type: bytes
-        self._converter = response_converter
+        self._converter = response_converter or TelnetResponseConverter()
 
     @property
     def connected(self):
@@ -191,8 +200,8 @@ class TelnetConnection(Connection):
 
     def run_command(self, command: Command, *, name=None, group_change_expected=False) -> List[str]:
         """Run a command through a Telnet connection.
-         Connect to the Telnet server if not currently connected, otherwise
-         use the existing connection.
+        Connect to the Telnet server if not currently connected, otherwise
+        use the existing connection.
         """
         cmd = command.value
         if name:
@@ -202,7 +211,7 @@ class TelnetConnection(Connection):
 
         try:
             self._telnet.read_very_eager()  # this is here to flush the read buffer
-            self._telnet.write('{}\n'.format(cmd).encode('UTF-8'))
+            self._telnet.write("{}\n".format(cmd).encode("UTF-8"))
             response = self._read_response(group_change_expected)
         except Exception as e:
             message = "Error executing command: %s" % str(e)
@@ -210,7 +219,7 @@ class TelnetConnection(Connection):
             self.disconnect()
             raise ConnectionException(message) from None
         else:
-            _LOGGER.debug('Command %s: %s', cmd, '\n'.join(response))
+            _LOGGER.debug("Command %s: %s", cmd, "\n".join(response))
             if self._converter:
                 return self._converter.convert(command, response)
             return response
@@ -222,10 +231,10 @@ class TelnetConnection(Connection):
             self._telnet.set_option_negotiation_callback(TelnetConnection.__negotiate_naws)
             self._telnet.open(self._host, self._port, self._timeout)
 
-            self._read_until(b'Login: ')
-            self._telnet.write((self._username + '\n').encode('UTF-8'))
-            self._read_until(b'Password: ')
-            self._telnet.write((self._password + '\n').encode('UTF-8'))
+            self._read_until(b"Login: ")
+            self._telnet.write((self._username + "\n").encode("UTF-8"))
+            self._read_until(b"Password: ")
+            self._telnet.write((self._password + "\n").encode("UTF-8"))
 
             self._read_response(True)
             self._set_max_window_size()
@@ -239,18 +248,22 @@ class TelnetConnection(Connection):
         """Disconnect the current Telnet connection."""
         try:
             if self._telnet:
-                self._telnet.write(b'exit\n')
+                self._telnet.write(b"exit\n")
         except Exception as e:
             _LOGGER.error("Telnet error on exit: %s" % str(e))
             pass
         self._telnet = None
 
     def _read_response(self, detect_new_prompt_string=False) -> List[str]:
-        needle = re.compile(br'\n\(\w+[-\w]+\)>') if detect_new_prompt_string else self._current_prompt_string
+        needle = (
+            re.compile(rb"\n\(\w+[-\w]+\)>")
+            if detect_new_prompt_string
+            else self._current_prompt_string
+        )
         (match, text) = self._read_until(needle)
         if detect_new_prompt_string:
             self._current_prompt_string = match[0]
-        return text.decode('UTF-8').split('\n')[1:-1]
+        return text.decode("UTF-8").split("\n")[1:-1]
 
     def _read_until(self, needle: Union[bytes, re.Pattern]) -> (re.Match, bytes):
         matcher = needle if isinstance(needle, re.Pattern) else re.escape(needle)
@@ -263,11 +276,11 @@ class TelnetConnection(Connection):
         """
         --> inform the Telnet server of the window width and height. see __negotiate_naws
         """
-        from telnetlib import IAC, NAWS, SB, SE
         import struct
+        from telnetlib import IAC, NAWS, SB, SE
 
-        width = struct.pack('H', 65000)
-        height = struct.pack('H', 5000)
+        width = struct.pack("H", 65000)
+        height = struct.pack("H", 5000)
         self._telnet.get_socket().sendall(IAC + SB + NAWS + width + height + IAC + SE)
 
     # noinspection PyProtectedMember
@@ -281,7 +294,7 @@ class TelnetConnection(Connection):
         :param option: telnet option
         :return: None
         """
-        from telnetlib import DO, DONT, IAC, WILL, WONT, NAWS
+        from telnetlib import DO, DONT, IAC, NAWS, WILL, WONT
 
         if option == NAWS:
             tsocket.sendall(IAC + WILL + NAWS)

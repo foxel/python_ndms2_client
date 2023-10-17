@@ -1,9 +1,9 @@
 import logging
 from typing import List, Optional
 
-from .models import Device, RouterInfo, InterfaceInfo
-from .connection import Connection
 from .command import Command
+from .connection import Connection
+from .models import Device, InterfaceInfo, RouterInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,38 +15,40 @@ class Client(object):
     def get_router_info(self) -> RouterInfo:
         info = self._connection.run_command(Command.VERSION)
 
-        _LOGGER.debug('Raw router info: %s', str(info))
-        assert isinstance(info, dict), 'Router info response is not a dictionary'
-        
+        _LOGGER.debug("Raw router info: %s", str(info))
+        assert isinstance(info, dict), "Router info response is not a dictionary"
+
         return RouterInfo.from_dict(info)
 
     def get_interfaces(self) -> List[InterfaceInfo]:
         collection = self._connection.run_command(Command.INTERFACES)
 
-        _LOGGER.debug('Raw interfaces info: %s', str(collection))
-        assert isinstance(collection, list), 'Interfaces info response is not a collection'
+        _LOGGER.debug("Raw interfaces info: %s", str(collection))
+        assert isinstance(collection, list), "Interfaces info response is not a collection"
 
         return [InterfaceInfo.from_dict(info) for info in collection]
 
     def get_interface_info(self, interface_name) -> Optional[InterfaceInfo]:
         info = self._connection.run_command(Command.INTERFACE, name=interface_name)
 
-        _LOGGER.debug('Raw interface info: %s', str(info))
-        assert isinstance(info, dict), 'Interface info response is not a dictionary'
+        _LOGGER.debug("Raw interface info: %s", str(info))
+        assert isinstance(info, dict), "Interface info response is not a dictionary"
 
-        if 'id' in info:
+        if "id" in info:
             return InterfaceInfo.from_dict(info)
 
         return None
 
-    def get_devices(self, *, try_hotspot=True, include_arp=True, include_associated=True) -> List[Device]:
+    def get_devices(
+        self, *, try_hotspot=True, include_arp=True, include_associated=True
+    ) -> List[Device]:
         """
-            Fetches a list of connected devices online
-            :param try_hotspot: first try `ip hotspot` command.
-            This is the most precise information on devices known to be online
-            :param include_arp: if try_hotspot is False or no hotspot devices detected
-            :param include_associated:
-            :return:
+        Fetches a list of connected devices online
+        :param try_hotspot: first try `ip hotspot` command.
+        This is the most precise information on devices known to be online
+        :param include_arp: if try_hotspot is False or no hotspot devices detected
+        :param include_associated:
+        :return:
         """
         devices = []
 
@@ -66,36 +68,44 @@ class Client(object):
     def get_hotspot_devices(self) -> List[Device]:
         hotspot_info = self.__get_hotspot_info()
 
-        return [Device(
-            mac=info.get('mac').upper(),
-            name=info.get('name'),
-            ip=info.get('ip'),
-            interface=info['interface'].get('name', '')
-        ) for info in hotspot_info.values() if 'interface' in info and info.get('link') == 'up']
+        return [
+            Device(
+                mac=info.get("mac").upper(),
+                name=info.get("name"),
+                ip=info.get("ip"),
+                interface=info["interface"].get("name", ""),
+            )
+            for info in hotspot_info.values()
+            if "interface" in info and info.get("link") == "up"
+        ]
 
     def get_arp_devices(self) -> List[Device]:
         result = self._connection.run_command(Command.ARP)
 
-        return [Device(
-            mac=info.get('mac').upper(),
-            name=info.get('name') or None,
-            ip=info.get('ip'),
-            interface=info.get('interface')
-        ) for info in result if info.get('mac') is not None]
+        return [
+            Device(
+                mac=info.get("mac").upper(),
+                name=info.get("name") or None,
+                ip=info.get("ip"),
+                interface=info.get("interface"),
+            )
+            for info in result
+            if info.get("mac") is not None
+        ]
 
     def get_associated_devices(self):
         associations = self._connection.run_command(Command.ASSOCIATIONS)
 
-        items = associations.get('station', [])
+        items = associations.get("station", [])
         if not isinstance(items, list):
             items = [items]
 
-        aps = set([info.get('ap') for info in items])
+        aps = set([info.get("ap") for info in items])
 
         ap_to_bridge = {}
         for ap in aps:
             ap_info = self._connection.run_command(Command.INTERFACE, name=ap)
-            ap_to_bridge[ap] = ap_info.get('group') or ap_info.get('interface-name')
+            ap_to_bridge[ap] = ap_info.get("group") or ap_info.get("interface-name")
 
         # try enriching the results with hotspot additional info
         hotspot_info = self.__get_hotspot_info()
@@ -103,17 +113,18 @@ class Client(object):
         devices = []
 
         for info in items:
-            mac = info.get('mac')
-            if mac is not None and info.get('authenticated') in ['1', 'yes', True]:
+            mac = info.get("mac")
+            if mac is not None and info.get("authenticated") in ["1", "yes", True]:
                 host_info = hotspot_info.get(mac)
 
                 devices.append(
                     Device(
-                    mac=mac.upper(),
-                    name=host_info.get('name') if host_info else None,
-                    ip=host_info.get('ip') if host_info else None,
-                    interface=ap_to_bridge.get(info.get('ap'), info.get('ap'))
-                ))
+                        mac=mac.upper(),
+                        name=host_info.get("name") if host_info else None,
+                        ip=host_info.get("ip") if host_info else None,
+                        interface=ap_to_bridge.get(info.get("ap"), info.get("ap")),
+                    )
+                )
 
         return devices
 
@@ -122,10 +133,8 @@ class Client(object):
     def __get_hotspot_info(self):
         info = self._connection.run_command(Command.HOTSPOT)
 
-        items = info.get('host', [])
+        items = info.get("host", [])
         if not isinstance(items, list):
             items = [items]
 
-        return {item.get('mac'): item for item in items}
-
-
+        return {item.get("mac"): item for item in items}

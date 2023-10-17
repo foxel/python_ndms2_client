@@ -1,4 +1,4 @@
-from typing import NamedTuple, List, Optional
+from typing import List, NamedTuple, Optional
 
 
 class Device(NamedTuple):
@@ -19,7 +19,7 @@ class Device(NamedTuple):
                         mac=old_dev.mac,
                         name=old_dev.name or dev.name,
                         ip=old_dev.ip or dev.ip,
-                        interface=old_dev.interface
+                        interface=old_dev.interface,
                     )
                 else:
                     res[key] = dev
@@ -40,14 +40,14 @@ class RouterInfo(NamedTuple):
     @classmethod
     def from_dict(cls, info: dict) -> "RouterInfo":
         return RouterInfo(
-            name=str(info.get('description', info.get('model', 'NDMS2 Router'))),
-            fw_version=str(info.get('title', info.get('release'))),
-            fw_channel=str(info.get('sandbox', 'unknown')),
-            model=str(info.get('model', info.get('hw_id'))),
-            hw_version=str(info.get('hw_version', 'N/A')),
-            manufacturer=str(info.get('manufacturer')),
-            vendor=str(info.get('vendor')),
-            region=str(info.get('region', 'N/A')),
+            name=str(info.get("description", info.get("model", "NDMS2 Router"))),
+            fw_version=str(info.get("title", info.get("release"))),
+            fw_channel=str(info.get("sandbox", "unknown")),
+            model=str(info.get("model", info.get("hw_id"))),
+            hw_version=str(info.get("hw_version", "N/A")),
+            manufacturer=str(info.get("manufacturer")),
+            vendor=str(info.get("vendor")),
+            region=str(info.get("region", "N/A")),
         )
 
 
@@ -68,18 +68,18 @@ class InterfaceInfo(NamedTuple):
     @classmethod
     def from_dict(cls, info: dict) -> "InterfaceInfo":
         return InterfaceInfo(
-            name=_str(info.get('interface-name')) or str(info['id']),
-            type=_str(info.get('type')),
-            description=_str(info.get('description')),
-            link=_str(info.get('link')),
-            connected=_str(info.get('connected')),
-            state=_str(info.get('state')),
-            mtu=_int(info.get('mtu')),
-            address=_str(info.get('address')),
-            mask=_str(info.get('mask')),
-            uptime=_int(info.get('uptime')),
-            security_level=_str(info.get('security-level')),
-            mac=_str(info.get('mac')),
+            name=_str(info.get("interface-name")) or str(info["id"]),
+            type=_str(info.get("type")),
+            description=_str(info.get("description")),
+            link=_str(info.get("link")),
+            connected=_str(info.get("connected")),
+            state=_str(info.get("state")),
+            mtu=_int(info.get("mtu")),
+            address=_str(info.get("address")),
+            mask=_str(info.get("mask")),
+            uptime=_int(info.get("uptime")),
+            security_level=_str(info.get("security-level")),
+            mac=_str(info.get("mac")),
         )
 
 
