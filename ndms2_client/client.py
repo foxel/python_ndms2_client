@@ -197,7 +197,7 @@ class Client(object):
 
         return devices
 
-    def set_interface_state(self, interface_id, is_up):
+    def set_interface_state(self, interface_id: str, is_up: bool):
         state_str = _INTERFACE_STATE_UP if is_up else _INTERFACE_STATE_DOWN
         self._connection.run_command(_SET_INTERFACE_STATE_CMD % {'interface': interface_id, 'state': state_str})
 
