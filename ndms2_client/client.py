@@ -6,7 +6,6 @@ from .connection import Connection
 
 _LOGGER = logging.getLogger(__name__)
 
-
 _VERSION_CMD = 'show version'
 _ARP_CMD = 'show ip arp'
 _ASSOCIATIONS_CMD = 'show associations'
@@ -40,7 +39,7 @@ class RouterInfo(NamedTuple):
     manufacturer: str
     vendor: str
     region: str
-    
+
     @classmethod
     def from_dict(cls, info: dict) -> "RouterInfo":
         return RouterInfo(
@@ -69,6 +68,7 @@ class InterfaceInfo(NamedTuple):
     security_level: Optional[str]
     mac: Optional[str]
     ssid: Optional[str]
+    plugged: Optional[str]
 
     @classmethod
     def from_dict(cls, info: dict) -> "InterfaceInfo":
@@ -86,6 +86,7 @@ class InterfaceInfo(NamedTuple):
             security_level=_str(info.get('security-level')),
             mac=_str(info.get('mac')),
             ssid=_str(info.get('ssid')),
+            plugged=_str(info.get('plugged')),
         )
 
 
@@ -98,7 +99,7 @@ class Client(object):
 
         _LOGGER.debug('Raw router info: %s', str(info))
         assert isinstance(info, dict), 'Router info response is not a dictionary'
-        
+
         return RouterInfo.from_dict(info)
 
     def get_interfaces(self) -> List[InterfaceInfo]:
