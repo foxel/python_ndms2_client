@@ -11,6 +11,7 @@ _ARP_CMD = 'show ip arp'
 _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
 _INTERFACE_CMD = 'show interface %s'
+_SAVE_CONFIGURATION = 'system configuration save'
 _INTERFACES_CMD = 'show interface'
 _SET_INTERFACE_STATE_CMD = 'interface {interface} {state}'
 _INTERFACE_STATE_UP = 'up'
@@ -199,6 +200,9 @@ class Client(object):
                 ))
 
         return devices
+
+    def save_configuration(self):
+        self._connection.run_command(_SAVE_CONFIGURATION)
 
     def set_interface_state(self, interface_id: str, is_up: bool):
         state_str = _INTERFACE_STATE_UP if is_up else _INTERFACE_STATE_DOWN
