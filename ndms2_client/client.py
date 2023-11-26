@@ -68,6 +68,7 @@ class InterfaceInfo(NamedTuple):
     uptime: Optional[int]
     security_level: Optional[str]
     mac: Optional[str]
+    ssid: Optional[str]
 
     @classmethod
     def from_dict(cls, info: dict) -> "InterfaceInfo":
@@ -84,6 +85,7 @@ class InterfaceInfo(NamedTuple):
             uptime=_int(info.get('uptime')),
             security_level=_str(info.get('security-level')),
             mac=_str(info.get('mac')),
+            ssid=_str(info.get('ssid')),
         )
 
 
