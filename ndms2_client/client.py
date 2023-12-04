@@ -23,6 +23,7 @@ _ARP_REGEX = re.compile(
     r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
     r'(?P<interface>([^ ]+))\s+'
 )
+_ERROR_REGEX = re.compile(r'error\[(?P<code>\d+)\]:\s*(?P<message>.*)')
 
 
 class Device(NamedTuple):
@@ -203,14 +204,17 @@ class Client(object):
         return devices
 
     def save_configuration(self):
-        self._connection.run_command(_SAVE_CONFIGURATION_CMD)
+        _check_command_result(self._connection.run_command(_SAVE_CONFIGURATION_CMD))
 
     def commit_failsafe_configuration(self):
-        self._connection.run_command(_FAILSAFE_COMMIT_CONFIGURATION_CMD)
+        _check_command_result(self._connection.run_command(_FAILSAFE_COMMIT_CONFIGURATION_CMD))
 
     def set_interface_state(self, interface_id: str, is_up: bool):
         state_str = _INTERFACE_STATE_UP if is_up else _INTERFACE_STATE_DOWN
-        self._connection.run_command(_SET_INTERFACE_STATE_CMD.format(interface=interface_id, state=state_str))
+        _check_command_result(self._connection.run_command(_SET_INTERFACE_STATE_CMD.format(
+            interface=interface_id,
+            state=state_str
+        )))
 
     # hotspot info is only available in newest firmware (2.09 and up) and in router mode
     # however missing command error will lead to empty dict returned
@@ -395,3 +399,12 @@ def _parse_collection_lines(lines: List[str]) -> List[Dict[str, any]]:
         result.append(_parse_dict_lines(item_lines))
 
     return result
+
+
+def _check_command_result(lines: List[str]) -> List[str]:
+    for line in lines:
+        match = _ERROR_REGEX.search(line)
+        if match:
+            raise Exception('Command failed with error {}: {}'.format(match.group('code'), match.group('message')))
+
+    return lines
