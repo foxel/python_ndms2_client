@@ -6,19 +6,24 @@ from .connection import Connection
 
 _LOGGER = logging.getLogger(__name__)
 
-
 _VERSION_CMD = 'show version'
 _ARP_CMD = 'show ip arp'
 _ASSOCIATIONS_CMD = 'show associations'
 _HOTSPOT_CMD = 'show ip hotspot'
 _INTERFACE_CMD = 'show interface %s'
+_SAVE_CONFIGURATION_CMD = 'system configuration save'
+_FAILSAFE_COMMIT_CONFIGURATION_CMD = 'system configuration fail-safe commit'
 _INTERFACES_CMD = 'show interface'
+_SET_INTERFACE_STATE_CMD = 'interface {interface} {state}'
+_INTERFACE_STATE_UP = 'up'
+_INTERFACE_STATE_DOWN = 'down'
 _ARP_REGEX = re.compile(
     r'(?P<name>.*?)\s+' +
     r'(?P<ip>([0-9]{1,3}[.]){3}[0-9]{1,3})?\s+' +
     r'(?P<mac>(([0-9a-f]{2}[:-]){5}([0-9a-f]{2})))\s+' +
     r'(?P<interface>([^ ]+))\s+'
 )
+_ERROR_REGEX = re.compile(r'error\[(?P<code>\d+)\]:\s*(?P<message>.*)')
 
 
 class Device(NamedTuple):
@@ -37,7 +42,7 @@ class RouterInfo(NamedTuple):
     manufacturer: str
     vendor: str
     region: str
-    
+
     @classmethod
     def from_dict(cls, info: dict) -> "RouterInfo":
         return RouterInfo(
@@ -65,6 +70,8 @@ class InterfaceInfo(NamedTuple):
     uptime: Optional[int]
     security_level: Optional[str]
     mac: Optional[str]
+    ssid: Optional[str]
+    plugged: Optional[str]
 
     @classmethod
     def from_dict(cls, info: dict) -> "InterfaceInfo":
@@ -81,6 +88,8 @@ class InterfaceInfo(NamedTuple):
             uptime=_int(info.get('uptime')),
             security_level=_str(info.get('security-level')),
             mac=_str(info.get('mac')),
+            ssid=_str(info.get('ssid')),
+            plugged=_str(info.get('plugged')),
         )
 
 
@@ -93,7 +102,7 @@ class Client(object):
 
         _LOGGER.debug('Raw router info: %s', str(info))
         assert isinstance(info, dict), 'Router info response is not a dictionary'
-        
+
         return RouterInfo.from_dict(info)
 
     def get_interfaces(self) -> List[InterfaceInfo]:
@@ -193,6 +202,19 @@ class Client(object):
                 ))
 
         return devices
+
+    def save_configuration(self):
+        _check_command_result(self._connection.run_command(_SAVE_CONFIGURATION_CMD))
+
+    def commit_failsafe_configuration(self):
+        _check_command_result(self._connection.run_command(_FAILSAFE_COMMIT_CONFIGURATION_CMD))
+
+    def set_interface_state(self, interface_id: str, is_up: bool):
+        state_str = _INTERFACE_STATE_UP if is_up else _INTERFACE_STATE_DOWN
+        _check_command_result(self._connection.run_command(_SET_INTERFACE_STATE_CMD.format(
+            interface=interface_id,
+            state=state_str
+        )))
 
     # hotspot info is only available in newest firmware (2.09 and up) and in router mode
     # however missing command error will lead to empty dict returned
@@ -377,3 +399,12 @@ def _parse_collection_lines(lines: List[str]) -> List[Dict[str, any]]:
         result.append(_parse_dict_lines(item_lines))
 
     return result
+
+
+def _check_command_result(lines: List[str]) -> List[str]:
+    for line in lines:
+        match = _ERROR_REGEX.search(line)
+        if match:
+            raise Exception('Command failed with error {}: {}'.format(match.group('code'), match.group('message')))
+
+    return lines
